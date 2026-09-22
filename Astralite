@@ -2915,10 +2915,83 @@ Settings:AddDropdown({
 Settings:AddParagraph("Astralite", "Built with TweenService, UIStroke, UIGradient and UIListLayout. No external assets needed.")
 
 -- Rejoin system
+local Y_OFFSET = 49
+
+local function autoClickButton(btn)
+	local pos = btn.AbsolutePosition + btn.AbsoluteSize / 2
+	pos = Vector2.new(pos.X, pos.Y + Y_OFFSET)
+	for i = 1, 5 do
+		local cur = game:GetService("UserInputService"):GetMouseLocation()
+		local diffX = pos.X - cur.X
+		local diffY = pos.Y - cur.Y
+		if math.abs(diffX) < 2 and math.abs(diffY) < 2 then break end
+		local before = game:GetService("UserInputService"):GetMouseLocation()
+		mousemoverel(diffX, diffY)
+		task.wait(0.05)
+		local after = game:GetService("UserInputService"):GetMouseLocation()
+		local actualX = after.X - before.X
+		local actualY = after.Y - before.Y
+		local scaleX = diffX ~= 0 and actualX / diffX or 1
+		local scaleY = diffY ~= 0 and actualY / diffY or 1
+		local cur2 = game:GetService("UserInputService"):GetMouseLocation()
+		local remX = pos.X - cur2.X
+		local remY = pos.Y - cur2.Y
+		if math.abs(remX) > 2 or math.abs(remY) > 2 then
+			mousemoverel(remX / scaleX, remY / scaleY)
+			task.wait(0.05)
+		end
+	end
+	mouse1click()
+end
+
+local function waitForVisible(path, timeout)
+	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+	local deadline = tick() + (timeout or 20)
+	while tick() < deadline do
+		local obj = PlayerGui
+		local ok = true
+		for _, p in ipairs(path) do
+			obj = obj:FindFirstChild(p)
+			if not obj then ok = false break end
+		end
+		if ok and obj.Visible then return obj end
+		task.wait(0.2)
+	end
+	return nil
+end
+
+-- auto-login on every game load
+task.spawn(function()
+	task.wait(2)
+	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+	-- Step 1: Endure
+	local endure = waitForVisible({"MainMenuGui","Frame","PlayButton"}, 15)
+	if not endure then return end
+	task.wait(0.5)
+	autoClickButton(endure)
+	task.wait(2)
+
+	-- Step 2: Slot 1
+	local slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_1","ButtonsFrame","PlayButton"}, 20)
+	if not slot then return end
+	task.wait(0.5)
+	autoClickButton(slot)
+	task.wait(2)
+
+	-- Step 3: Current server (first in list)
+	local server = waitForVisible({"ServerMenuGui","Frame","MainFrame","ScrollingFrame","ServerMenuTemplate"}, 20)
+	if not server then return end
+	task.wait(0.5)
+	autoClickButton(server)
+
+	Window:Notify({ Title = "Astralite", Content = "Auto-login complete. Welcome back!", Duration = 4 })
+end)
+
 local function doRejoin()
-	Window:Notify({ Title = "Rejoin", Content = "Saving prefs and rejoining...", Duration = 3 })
+	Window:Notify({ Title = "Rejoin", Content = "Rejoining current server...", Duration = 3 })
 	savePrefs()
-	task.wait(1)
+	task.wait(0.5)
 	pcall(function()
 		game:GetService("TeleportService"):TeleportToPlaceInstance(
 			game.PlaceId,
