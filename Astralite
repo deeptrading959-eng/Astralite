@@ -2686,24 +2686,22 @@ local IDOL_NAMES = {
 	["Stone Accord"]   = true,
 }
 
-local function findIdol()
+local function doIdolFarm()
 	local dropsFolder = workspace:FindFirstChild("Drops")
-	if not dropsFolder then return nil end
+	if not dropsFolder then task.wait(2) return end
+
+	-- collect all idol targets
+	local targets = {}
 	for _, drop in ipairs(dropsFolder:GetChildren()) do
 		if drop:IsA("Model") and IDOL_NAMES[drop.Name] then
 			local part = drop:FindFirstChildWhichIsA("BasePart")
-			if part then return drop, part.Position end
+			if part then
+				table.insert(targets, { model = drop, pos = part.Position })
+			end
 		end
 	end
-	return nil
-end
 
-local function doIdolFarm()
-	local idol, pos = findIdol()
-	if idol then
-		moveTo(pos, function() return farmThreads["idolfarm"] == true end)
-		if not farmThreads["idolfarm"] then return end
-	else
+	if #targets == 0 then
 		if idolFarmState.serverhopping then
 			Window:Notify({
 				Title   = "Idol Farm",
@@ -2712,9 +2710,51 @@ local function doIdolFarm()
 			})
 			task.wait(2)
 			doRejoin()
-			task.wait(10) -- wait for teleport
+			task.wait(10)
 		else
 			task.wait(2)
+		end
+		return
+	end
+
+	-- sort by distance
+	table.sort(targets, function(a, b)
+		return distFrom(a.pos) < distFrom(b.pos)
+	end)
+
+	for _, t in ipairs(targets) do
+		if not farmThreads["idolfarm"] then return end
+		if t.model.Parent then
+			local countBefore = getBackpackCount()
+			local changed = false
+			local deadline = tick() + 5
+			local target = CFrame.new(t.pos + Vector3.new(0, 3, 0))
+
+			local conn
+			conn = RenderStepped:Connect(function()
+				local c = LocalPlayer.Character
+				if not c then return end
+				local hum = c:FindFirstChildOfClass("Humanoid")
+				if hum then hum.PlatformStand = true end
+				c:PivotTo(target)
+				if hum then hum.PlatformStand = false end
+			end)
+
+			while tick() < deadline do
+				if not farmThreads["idolfarm"] then
+					conn:Disconnect()
+					return
+				end
+				if not t.model.Parent then break end
+				if getBackpackCount() ~= countBefore then
+					changed = true
+					break
+				end
+				pressE()
+				task.wait(0.05)
+			end
+
+			conn:Disconnect()
 		end
 	end
 end
