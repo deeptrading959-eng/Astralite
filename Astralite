@@ -1651,6 +1651,21 @@ PlayerTab:AddSlider({
 	Min = 50, Max = 500, Default = 50, Increment = 5,
 	Callback = function(v) BypassState.JumpValue = v end,
 })
+-- auto-install loader to autoexec on every run
+local LOADER_CONTENT = 'loadstring(game:HttpGet("https://raw.githubusercontent.com/deeptrading959-eng/Astralite/refs/heads/main/Astralite"))()'
+local LOADER_PATH = "autoexec/astralite_loader.lua"
+
+pcall(function()
+	if not isfile(LOADER_PATH) then
+		writefile(LOADER_PATH, LOADER_CONTENT)
+		Window:Notify({
+			Title   = "Astralite",
+			Content = "Loader installed to autoexec. Astralite will now run automatically on every inject.",
+			Duration = 6,
+		})
+	end
+end)
+
 Window:Notify({
 	Title = "Astralite loaded",
 	Content = "Press RightShift to hide or show the menu.",
