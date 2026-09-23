@@ -2127,6 +2127,24 @@ local RS       = game:GetService("RunService")
 -- Shared helpers
 local VIM = game:GetService("VirtualInputManager")
 local RenderStepped = game:GetService("RunService").RenderStepped
+local Camera = workspace.CurrentCamera
+
+-- locks camera to maintain its offset from character during farm TPs
+local function lockCameraToTarget(targetCFrame)
+	local char = LocalPlayer.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return nil end
+	-- capture current offset between camera and hrp
+	local camOffset = Camera.CFrame:ToObjectSpace(hrp.CFrame)
+	return function()
+		Camera.CameraType = Enum.CameraType.Scriptable
+		Camera.CFrame = targetCFrame * camOffset:Inverse()
+	end
+end
+
+local function unlockCamera()
+	Camera.CameraType = Enum.CameraType.Custom
+end
 
 local function pressE()
 	VIM:SendKeyEvent(true, "E", false, game)
@@ -2142,6 +2160,7 @@ local function spamTP(position, duration, runningFn)
 	local target = CFrame.new(position + Vector3.new(0, 3, 0))
 
 	local deadline = tick() + (duration or 0.5)
+	local camUpdate = lockCameraToTarget(target)
 	local conn
 	conn = RenderStepped:Connect(function()
 		local c = LocalPlayer.Character
@@ -2149,6 +2168,7 @@ local function spamTP(position, duration, runningFn)
 		if hum then hum.PlatformStand = true end
 		c:PivotTo(target)
 		if hum then hum.PlatformStand = false end
+		if camUpdate then camUpdate() end
 	end)
 
 	-- spam E while tp is running
@@ -2159,6 +2179,7 @@ local function spamTP(position, duration, runningFn)
 	end
 
 	conn:Disconnect()
+	unlockCamera()
 	if hum then hum.PlatformStand = false end
 end
 
@@ -2593,6 +2614,7 @@ local function doDropFarm()
 				local changed = false
 				local deadline = tick() + 5
 				local target = CFrame.new(t.pos + Vector3.new(0, 3, 0))
+				local camUpdate = lockCameraToTarget(target)
 
 				local conn
 				conn = RenderStepped:Connect(function()
@@ -2602,11 +2624,13 @@ local function doDropFarm()
 					if hum then hum.PlatformStand = true end
 					c:PivotTo(target)
 					if hum then hum.PlatformStand = false end
+					if camUpdate then camUpdate() end
 				end)
 
 				while tick() < deadline do
 					if not farmThreads["dropfarm"] then
 						conn:Disconnect()
+						unlockCamera()
 						return
 					end
 					if not t.model.Parent then break end
@@ -2619,6 +2643,7 @@ local function doDropFarm()
 				end
 
 				conn:Disconnect()
+				unlockCamera()
 
 				if changed then
 					consecutiveFails = 0
@@ -2733,6 +2758,7 @@ local function doIdolFarm()
 			local countBefore = getBackpackCount()
 			local deadline = tick() + 5
 			local target = CFrame.new(t.pos + Vector3.new(0, 3, 0))
+			local camUpdate = lockCameraToTarget(target)
 
 			local conn
 			conn = RenderStepped:Connect(function()
@@ -2744,11 +2770,13 @@ local function doIdolFarm()
 				if hum then hum.PlatformStand = true end
 				pcall(function() c:PivotTo(target) end)
 				if hum then hum.PlatformStand = false end
+				if camUpdate then camUpdate() end
 			end)
 
 			while tick() < deadline do
 				if not farmThreads["idolfarm"] then
 					conn:Disconnect()
+					unlockCamera()
 					return
 				end
 				if not t.model.Parent then break end
@@ -2758,6 +2786,7 @@ local function doIdolFarm()
 			end
 
 			conn:Disconnect()
+			unlockCamera()
 		end
 	end
 end
@@ -3205,15 +3234,8 @@ task.spawn(function()
 			return
 		end
 		task.wait(0.5)
-		-- fire connections directly since it's an ImageButton
-		local conns = getconnections(server.MouseButton1Click)
-		if conns and #conns > 0 then
-			for _, c in ipairs(conns) do
-				pcall(function() c.Fire() end)
-			end
-		else
-			autoClickButton(server)
-		end
+		print("[Astralite] Server btn pos:", server.AbsolutePosition, "size:", server.AbsoluteSize)
+		autoClickButton(server)
 
 		-- wait for world to load then show and restore
 		task.wait(5)
