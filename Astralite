@@ -3022,34 +3022,53 @@ local function waitForVisible(path, timeout)
 	return nil
 end
 
--- auto-login on every game load
+-- auto-login: watches for main menu at any point (initial load or after rejoin)
 task.spawn(function()
-	task.wait(2)
 	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-	-- Step 1: Endure
-	local endure = waitForVisible({"MainMenuGui","Frame","PlayButton"}, 15)
-	if not endure then return end
-	task.wait(0.5)
-	autoClickButton(endure)
-	task.wait(2)
+	local function doAutoLogin()
+		print("[Astralite] Menu detected, auto-logging in...")
+		-- Step 1: Endure
+		local endure = waitForVisible({"MainMenuGui","Frame","PlayButton"}, 15)
+		if not endure then return end
+		task.wait(0.5)
+		autoClickButton(endure)
 
-	-- Step 2: Slot 1
-	local slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_1","ButtonsFrame","PlayButton"}, 20)
-	if not slot then return end
-	task.wait(0.5)
-	autoClickButton(slot)
-	task.wait(2)
+		-- Step 2: Slot 1
+		local slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_1","ButtonsFrame","PlayButton"}, 20)
+		if not slot then return end
+		task.wait(0.5)
+		autoClickButton(slot)
 
-	-- Step 3: Current server (first in list)
-	local server = waitForVisible({"ServerMenuGui","Frame","MainFrame","ScrollingFrame","ServerMenuTemplate"}, 20)
-	if not server then return end
-	task.wait(0.5)
-	autoClickButton(server)
+		-- Step 3: Current server (first in list)
+		local server = waitForVisible({"ServerMenuGui","Frame","MainFrame","ScrollingFrame","ServerMenuTemplate"}, 20)
+		if not server then return end
+		task.wait(0.5)
+		autoClickButton(server)
 
-	Window:Notify({ Title = "Astralite", Content = "Auto-login complete. Welcome back!", Duration = 4 })
+		Window:Notify({ Title = "Astralite", Content = "Auto-login complete. Welcome back!", Duration = 4 })
+	end
+
+	-- watch for MainMenuGui appearing or becoming visible at any time
+	local function watchMainMenu()
+		local mainMenu = PlayerGui:WaitForChild("MainMenuGui", 30)
+		if not mainMenu then return end
+
+		-- if it's already visible right now (just loaded into menu)
+		if mainMenu.Frame and mainMenu.Frame.Visible then
+			task.spawn(doAutoLogin)
+		end
+
+		-- watch for future visibility changes (after teleport)
+		mainMenu.Frame:GetPropertyChangedSignal("Visible"):Connect(function()
+			if mainMenu.Frame.Visible then
+				task.spawn(doAutoLogin)
+			end
+		end)
+	end
+
+	watchMainMenu()
 end)
-
 
 
 Settings:AddSection("Server")
