@@ -3152,10 +3152,11 @@ task.spawn(function()
 	local function doAutoLogin()
 		if loginRunning then return end
 		loginRunning = true
-		print("[Astralite] Menu detected, clicking through...")
+		print("[Astralite] Menu detected, waiting 5s then clicking through...")
 
 		-- hide UI while in menu
 		Window:SetVisible(false)
+		task.wait(5)
 
 		local endure = waitForVisible({"MainMenuGui","Frame","PlayButton"}, 15)
 		if not endure then
@@ -3180,14 +3181,39 @@ task.spawn(function()
 		task.wait(0.5)
 		autoClickButton(slot)
 
-		local server = waitForVisible({"ServerMenuGui","Frame","MainFrame","ScrollingFrame","ServerMenuTemplate"}, 20)
+		-- wait for server list to populate (templates are ImageButtons)
+		local server = nil
+		local sDeadline = tick() + 20
+		while tick() < sDeadline do
+			local pg = LocalPlayer:WaitForChild("PlayerGui")
+			local scrolling = pg:FindFirstChild("ServerMenuGui")
+				and pg.ServerMenuGui:FindFirstChild("Frame")
+				and pg.ServerMenuGui.Frame:FindFirstChild("MainFrame")
+				and pg.ServerMenuGui.Frame.MainFrame:FindFirstChild("ScrollingFrame")
+			if scrolling then
+				local tmpl = scrolling:FindFirstChild("ServerMenuTemplate")
+				if tmpl and tmpl:IsA("ImageButton") then
+					server = tmpl
+					break
+				end
+			end
+			task.wait(0.3)
+		end
 		if not server then
 			Window:SetVisible(true)
 			loginRunning = false
 			return
 		end
 		task.wait(0.5)
-		autoClickButton(server)
+		-- fire connections directly since it's an ImageButton
+		local conns = getconnections(server.MouseButton1Click)
+		if conns and #conns > 0 then
+			for _, c in ipairs(conns) do
+				pcall(function() c.Fire() end)
+			end
+		else
+			autoClickButton(server)
+		end
 
 		-- wait for world to load then show and restore
 		task.wait(5)
