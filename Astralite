@@ -1,5 +1,5 @@
 --[[
-	Nebula UI  -  a purple Roblox interface library + demo
+	Astralite UI - a purple Roblox interface library
 	--------------------------------------------------------
 	Put this in a LocalScript inside:
 		StarterPlayer > StarterPlayerScripts
@@ -16,7 +16,7 @@
 		- Player profile card with avatar headshot
 
 	API
-		local Window = Library:CreateWindow({ Title = "Nebula", Subtitle = "v1.0" })
+		local Window = Library:CreateWindow({ Title = "Astralite", Subtitle = "Free" })
 		local Tab    = Window:AddTab("Player")
 		Tab:AddSection("Movement")
 		Tab:AddToggle({ Name = "...", Default = false, Callback = function(v) end })
@@ -177,8 +177,8 @@ function Library:CreateWindow(config)
 	config = config or {}
 	local self = setmetatable({}, Window)
 
-	self.Title = config.Title or "Nebula"
-	self.Subtitle = config.Subtitle or "v1.0"
+	self.Title = config.Title or "Astralite"
+	self.Subtitle = config.Subtitle or "Free"
 	self.Width = (config.Size and config.Size.X) or 680
 	self.Height = (config.Size and config.Size.Y) or 450
 	self.ToggleKey = config.ToggleKey or Enum.KeyCode.RightShift
@@ -188,12 +188,12 @@ function Library:CreateWindow(config)
 	self.Minimized = false
 	self.TabOrder = 0
 
-	local old = PlayerGui:FindFirstChild("NebulaUI")
+	local old = PlayerGui:FindFirstChild("AstraliteUI")
 	if old then old:Destroy() end
 
 	-- ScreenGui
 	local gui = Create("ScreenGui", {
-		Name = "NebulaUI",
+		Name = "AstraliteUI",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		Parent = PlayerGui,
@@ -1633,8 +1633,8 @@ game:GetService("RunService").RenderStepped:Connect(function()
 end)
 
 local Window = Library:CreateWindow({
-	Title = "Nebula",
-	Subtitle = "v1.0",
+	Title = "Astralite",
+	Subtitle = "Free",
 	Size = Vector2.new(680, 450),
 	ToggleKey = Enum.KeyCode.RightShift,
 })
@@ -1653,8 +1653,8 @@ PlayerTab:AddSlider({
 	Callback = function(v) BypassState.JumpValue = v end,
 })
 Window:Notify({
-	Title = "Nebula loaded",
-	Content = "Press RightShift to hide or show the menu.",
+	Title = "Astralite loaded",
+	Content = "Press RightShift to toggle. DEL to reopen if closed.",
 	Duration = 5,
 })
 
@@ -1722,8 +1722,8 @@ local CAT_COLORS = {
 ---------------------------------------------------------------------
 -- ESP folder
 ---------------------------------------------------------------------
-local ESP_FOLDER = workspace:FindFirstChild("__NebulaESP") or Instance.new("Folder")
-ESP_FOLDER.Name = "__NebulaESP"
+local ESP_FOLDER = workspace:FindFirstChild("__AstraliteESP") or Instance.new("Folder")
+ESP_FOLDER.Name = "__AstraliteESP"
 ESP_FOLDER.Parent = workspace
 
 local ESPObjects = {}   -- keyed by model
@@ -2184,7 +2184,7 @@ local function startLoop(key, fn)
 		while farmThreads[key] do
 			local ok, err = pcall(fn)
 			if not ok then
-				print("[Nebula] " .. key .. " error:", tostring(err))
+				print("[Astralite] " .. key .. " error:", tostring(err))
 			end
 			-- only wait if still running, so stop is near-instant
 			if farmThreads[key] then
@@ -2200,7 +2200,7 @@ end
 ---------------------------------------------------------------------
 -- SAVE / LOAD PREFERENCES
 ---------------------------------------------------------------------
-local SAVE_FILE   = "nebula_prefs.json"
+local SAVE_FILE   = "astralite_prefs.json"
 local saveData    = {}      -- populated by toggles/sliders as they fire
 local saveEnabled = true
 
@@ -3116,7 +3116,10 @@ end
 task.spawn(function()
 	local PG = LocalPlayer:WaitForChild("PlayerGui")
 
+	local loginRunning = false
 	local function doAutoLogin()
+		if loginRunning then return end
+		loginRunning = true
 		print("[Astralite] Menu detected, clicking through...")
 
 		-- hide UI while in menu
@@ -3124,9 +3127,9 @@ task.spawn(function()
 
 		local endure = waitForVisible({"MainMenuGui","Frame","PlayButton"}, 15)
 		if not endure then
-			-- already in game, just restore
 			Window:SetVisible(true)
 			restoreSession()
+			loginRunning = false
 			return
 		end
 		task.wait(0.5)
@@ -3135,6 +3138,7 @@ task.spawn(function()
 		local slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_1","ButtonsFrame","PlayButton"}, 20)
 		if not slot then
 			Window:SetVisible(true)
+			loginRunning = false
 			return
 		end
 		task.wait(0.5)
@@ -3143,6 +3147,7 @@ task.spawn(function()
 		local server = waitForVisible({"ServerMenuGui","Frame","MainFrame","ScrollingFrame","ServerMenuTemplate"}, 20)
 		if not server then
 			Window:SetVisible(true)
+			loginRunning = false
 			return
 		end
 		task.wait(0.5)
@@ -3153,25 +3158,41 @@ task.spawn(function()
 		Window:SetVisible(true)
 		Window:Notify({ Title = "Astralite", Content = "Auto-login complete.", Duration = 4 })
 		restoreSession()
+		loginRunning = false
 	end
 
-	-- check immediately - are we on the menu right now?
+	-- watch for MainMenuGui visibility at any point
+	local function watchMenu(mainMenu)
+		if not mainMenu or not mainMenu:FindFirstChild("Frame") then return end
+		-- already visible right now
+		if mainMenu.Frame.Visible then
+			task.spawn(doAutoLogin)
+		end
+		mainMenu.Frame:GetPropertyChangedSignal("Visible"):Connect(function()
+			if mainMenu.Frame.Visible then
+				task.spawn(doAutoLogin)
+			end
+		end)
+	end
+
+	-- check immediately
 	task.wait(1)
 	local mainMenu = PG:FindFirstChild("MainMenuGui")
-	if mainMenu and mainMenu:FindFirstChild("Frame") and mainMenu.Frame.Visible then
-		task.spawn(doAutoLogin)
+	if mainMenu then
+		if mainMenu:FindFirstChild("Frame") and mainMenu.Frame.Visible then
+			task.spawn(doAutoLogin)
+		else
+			restoreSession()
+		end
+		watchMenu(mainMenu)
 	else
-		-- already in game
+		-- not in menu, already in game
 		restoreSession()
-	end
-
-	-- watch for menu appearing in the future (after rejoin)
-	local mainMenu2 = PG:WaitForChild("MainMenuGui", 30)
-	if mainMenu2 and mainMenu2:FindFirstChild("Frame") then
-		mainMenu2.Frame:GetPropertyChangedSignal("Visible"):Connect(function()
-			if mainMenu2.Frame.Visible then
-				Window:SetVisible(false)
-				task.spawn(doAutoLogin)
+		-- wait for it to appear later (after rejoin)
+		local added = PG.ChildAdded:Connect(function(child)
+			if child.Name == "MainMenuGui" then
+				task.wait(0.5)
+				watchMenu(child)
 			end
 		end)
 	end
