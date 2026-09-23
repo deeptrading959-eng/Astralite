@@ -2126,6 +2126,26 @@ Visuals:AddMultiSelect({
 })
 
 ---------------------------------------------------------------------
+local function doRejoin()
+	Window:Notify({ Title = "Rejoin", Content = "Rejoining current server...", Duration = 3 })
+	-- savePrefs called only if it exists
+	pcall(savePrefs)
+	task.wait(1)
+	local ok, err = pcall(function()
+		game:GetService("TeleportService"):TeleportToPlaceInstance(
+			game.PlaceId,
+			game.JobId,
+			LocalPlayer
+		)
+	end)
+	if not ok then
+		print("[Astralite] TeleportToPlaceInstance failed:", err)
+		pcall(function()
+			game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+		end)
+	end
+end
+
 -- AUTOFARM TAB
 ---------------------------------------------------------------------
 
@@ -2734,9 +2754,11 @@ local function doIdolFarm()
 			conn = RenderStepped:Connect(function()
 				local c = LocalPlayer.Character
 				if not c then return end
+				local hrp = c:FindFirstChild("HumanoidRootPart")
+				if not hrp then return end
 				local hum = c:FindFirstChildOfClass("Humanoid")
 				if hum then hum.PlatformStand = true end
-				c:PivotTo(target)
+				pcall(function() c:PivotTo(target) end)
 				if hum then hum.PlatformStand = false end
 			end)
 
@@ -3028,18 +3050,7 @@ task.spawn(function()
 	Window:Notify({ Title = "Astralite", Content = "Auto-login complete. Welcome back!", Duration = 4 })
 end)
 
-local function doRejoin()
-	Window:Notify({ Title = "Rejoin", Content = "Rejoining current server...", Duration = 3 })
-	savePrefs()
-	task.wait(0.5)
-	pcall(function()
-		game:GetService("TeleportService"):TeleportToPlaceInstance(
-			game.PlaceId,
-			game.JobId,
-			LocalPlayer
-		)
-	end)
-end
+
 
 Settings:AddSection("Server")
 Settings:AddButton({
