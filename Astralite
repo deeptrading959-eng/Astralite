@@ -2271,6 +2271,21 @@ local function setPref(key, value)
 	saveData[key] = value
 end
 
+-- detect active slot from SaveSlotSync and save it
+local _activeSlot = savedPrefs["ActiveSlot"] or 1
+pcall(function()
+	local RS_s = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+	local slotSync = RS_s and RS_s:FindFirstChild("SaveSlotSync")
+	if slotSync then
+		slotSync.OnClientEvent:Connect(function(data)
+			if data and data.LastActiveSlot then
+				_activeSlot = data.LastActiveSlot
+				setPref("ActiveSlot", _activeSlot)
+			end
+		end)
+	end
+end)
+
 ---------------------------------------------------------------------
 -- CHEST FARM
 ---------------------------------------------------------------------
@@ -3079,6 +3094,23 @@ end
 
 -- restore farms and settings after loading into game
 local function restoreSession()
+	-- walk forward ~5 studs to break out of spawn forcefield
+	task.spawn(function()
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart", 10)
+		local hum = char:WaitForChild("Humanoid", 10)
+		if not hrp or not hum then return end
+		-- wait until humanoid is fully loaded and not dead
+		local deadline = tick() + 10
+		while hum.Health <= 0 and tick() < deadline do task.wait(0.2) end
+		task.wait(0.5)
+		local forward = hrp.CFrame.LookVector
+		local target = hrp.Position + forward * 5
+		hum:MoveTo(target)
+		task.wait(1)
+		hum:MoveTo(hrp.Position) -- stop
+	end)
+
 	-- restore bypass values
 	BypassState.SpeedValue = savedPrefs["WalkSpeed"] or 16
 	BypassState.JumpValue  = savedPrefs["JumpPower"]  or 50
@@ -3135,11 +3167,15 @@ task.spawn(function()
 		task.wait(0.5)
 		autoClickButton(endure)
 
-		local slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_1","ButtonsFrame","PlayButton"}, 20)
+		local slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_" .. _activeSlot,"ButtonsFrame","PlayButton"}, 20)
 		if not slot then
-			Window:SetVisible(true)
-			loginRunning = false
-			return
+			-- fallback to slot 1
+			slot = waitForVisible({"SaveSlotsGui","Frame","ScrollingFrame","SaveSlot_1","ButtonsFrame","PlayButton"}, 5)
+			if not slot then
+				Window:SetVisible(true)
+				loginRunning = false
+				return
+			end
 		end
 		task.wait(0.5)
 		autoClickButton(slot)
@@ -3199,6 +3235,18 @@ task.spawn(function()
 end)
 
 Settings:AddSection("Server")
+Settings:AddDropdown({
+	Name = "Auto-login Slot",
+	Options = { "Slot 1", "Slot 2", "Slot 3", "Slot 4" },
+	Default = "Slot " .. _activeSlot,
+	Callback = function(v)
+		local num = tonumber(v:match("%d+"))
+		if num then
+			_activeSlot = num
+			setPref("ActiveSlot", num)
+		end
+	end,
+})
 Settings:AddButton({
 	Name = "Test Serverhop",
 	Callback = function()
